@@ -17,8 +17,8 @@ var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
 var algo = flag.String("algorithm", "agnivade", "which algorithim to use")
 var bufsize = flag.Int("bufsize", 1024*2, "how many bytes to read ahead to guess offset")
 var lookback = flag.Int("lookback", 16, "how many lines to keep in the lookback cache")
-var similarity = flag.Int("similarity", 70, "similarity percentage to consider a match")
-var stats = flag.Bool("stats", true, "show stats after processing")
+var similarity = flag.Int("similarity", 80, "similarity percentage to consider a match")
+var stats = flag.Bool("stats", false, "show stats after processing")
 
 func texttheater(s, t string) float64 {
 	return lev2.RatioForStrings([]rune(s), []rune(t), lev2.DefaultOptions)
@@ -26,8 +26,8 @@ func texttheater(s, t string) float64 {
 
 func agnivade(s, t string) float64 {
 	dist := float64(lev.ComputeDistance(s, t))
-	total_len := float64(len(s) + len(t))
-	return (total_len - dist) / total_len
+	totalLen := float64(len(s) + len(t))
+	return (totalLen - dist) / totalLen
 }
 
 func main() {
@@ -87,14 +87,7 @@ func main() {
 			printed++
 		}
 		processed++
-		// fmt.Fprintf(os.Stderr, "\rProcessed %d lines...", processed)
 	}
-
-	// fmt.Fprintf(os.Stderr, "\n")
-
-	// for line, n := range counts {
-	// 	fmt.Printf("%d\t%s\n", n, line)
-	// }
 
 	if *stats {
 		fmt.Fprintf(os.Stderr, "Offset: %d\n", offset)
