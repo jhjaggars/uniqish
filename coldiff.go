@@ -10,11 +10,23 @@ import (
 
 var width = flag.Int("width", 256, "number of columns to compare")
 
+func moff(offsets map[int]int) (col int) {
+	mx := 0
+	for c, n := range offsets {
+		if n > mx {
+			mx = n
+			col = c
+		}
+	}
+	return
+}
+
 func main() {
 	flag.Parse()
 
 	prevline := make([]rune, *width)
 	diff := make([]rune, *width)
+	offsets := make(map[int]int)
 
 	for j := 0; j < *width; j++ {
 		prevline[j] = ' '
@@ -30,6 +42,7 @@ func main() {
 
 		// ignore newlines
 		line := strings.TrimRight(input.Text(), "\n")
+		changed := false
 
 		// matches are 0 diffs are 1
 		for i, r := range line {
@@ -40,6 +53,10 @@ func main() {
 				diff[i] = '_'
 			default:
 				diff[i] = 'X'
+				if !changed {
+					changed = true
+					offsets[i]++
+				}
 			}
 		}
 
@@ -47,4 +64,6 @@ func main() {
 
 		fmt.Printf("%s %s\n", string(diff), line)
 	}
+
+	fmt.Printf("Best offset is: %d\n", moff(offsets))
 }
