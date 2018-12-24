@@ -14,7 +14,7 @@ import (
 )
 
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
-var algo = flag.String("algorithm", "", "which algorithim to use")
+var algo = flag.String("algorithm", "agnivade", "which algorithim to use")
 var bufsize = flag.Int("bufsize", 1024*2, "how many bytes to read ahead to guess offset")
 var lookback = flag.Int("lookback", 16, "how many lines to keep in the lookback cache")
 var similarity = flag.Int("similarity", 70, "similarity percentage to consider a match")
@@ -42,11 +42,13 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	edFunc := agnivade
+	var edFunc func(s, t string) float64
 	switch *algo {
 	case "texttheater":
 		edFunc = texttheater
 	case "agnivade":
+		fallthrough
+	default:
 		edFunc = agnivade
 	}
 
