@@ -7,6 +7,12 @@ similar.  To be clear, I *don't* know how `uno` works other than what is
 described in the post, and I'm pretty sure it's more sophisticated than
 described.
 
+# How to get it
+
+```
+go get -u github.com/jhjaggars/uniqish
+```
+
 # How to use it
 
 ```
