@@ -1,4 +1,4 @@
-package main
+package peeker
 
 import (
 	"bufio"
@@ -10,7 +10,7 @@ import (
 
 var width int = 128
 
-func calcoff(buf []byte) int {
+func Calcoff(buf []byte, width int) int {
 	r := bytes.NewReader(buf)
 	s := bufio.NewScanner(r)
 	prevline := make([]rune, width)
@@ -24,6 +24,9 @@ func calcoff(buf []byte) int {
 	// calculate distance to first change for each line
 	for s.Scan() {
 		for i, r := range s.Text() {
+			if i >= len(prevline) {
+				break
+			}
 			if prevline[i] != r {
 				offsets[i]++
 				break
@@ -48,7 +51,7 @@ func main() {
 	bufsize := 1024 * 8
 	r := bufio.NewReaderSize(os.Stdin, bufsize)
 	peeked, _ := r.Peek(bufsize)
-	offset := calcoff(peeked)
+	offset := Calcoff(peeked, width)
 	var p strings.Builder
 	for i := 0; i < offset; i++ {
 		fmt.Fprint(&p, " ")
