@@ -3,9 +3,6 @@ package peeker
 import (
 	"bufio"
 	"bytes"
-	"fmt"
-	"os"
-	"strings"
 )
 
 var width int = 128
@@ -45,25 +42,4 @@ func Calcoff(buf []byte, width int) int {
 		}
 	}
 	return col
-}
-
-func main() {
-	bufsize := 1024 * 8
-	r := bufio.NewReaderSize(os.Stdin, bufsize)
-	peeked, _ := r.Peek(bufsize)
-	offset := Calcoff(peeked, width)
-	var p strings.Builder
-	for i := 0; i < offset; i++ {
-		fmt.Fprint(&p, " ")
-	}
-
-	input := bufio.NewScanner(r)
-	for input.Scan() {
-		line := input.Text()
-		if strings.HasPrefix(line, " ") || len(line) < offset {
-			fmt.Printf("%s\n", input.Text())
-		} else {
-			fmt.Printf("%s%s\n", p.String(), input.Text()[offset:])
-		}
-	}
 }
