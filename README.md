@@ -2,6 +2,8 @@
 
 A log filtering program inspired by [uno](https://unomaly.com/blog/its-in-the-anomalies/).
 
+Looks like the company behind uno was acquired some time ago, I think the same [blog content](https://feeduno.io/) is still available though.
+
 After reading the above blog post, I set out to build something that _sounds_
 similar.  To be clear, I *don't* know how `uno` works other than what is
 described in the post, and I'm pretty sure it's more sophisticated than
