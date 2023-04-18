@@ -8,7 +8,7 @@ import (
 	"runtime/pprof"
 
 	lev "github.com/agnivade/levenshtein"
-	"github.com/hashicorp/golang-lru"
+	"github.com/hashicorp/golang-lru/v2"
 	"github.com/jhjaggars/uniqish/pkg/peeker"
 	lev2 "github.com/texttheater/golang-levenshtein/levenshtein"
 )
@@ -57,7 +57,7 @@ func main() {
 	peeked, _ := r.Peek(*bufsize)
 	offset := peeker.Calcoff(peeked, 64)
 	input := bufio.NewScanner(r)
-	arc, err := lru.NewARC(*lookback)
+	arc, err := lru.New[string, interface{}](*lookback)
 	processed := 0
 	loops := 0
 	printed := 0
@@ -74,8 +74,8 @@ func main() {
 		found := false
 		for _, k := range arc.Keys() {
 			loops++
-			if edFunc(linekey, k.(string)) >= (float64(*similarity) / 100.0) {
-				counts[k.(string)]++
+			if edFunc(linekey, k) >= (float64(*similarity) / 100.0) {
+				counts[k]++
 				found = true
 				break
 			}
