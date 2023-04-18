@@ -33,15 +33,6 @@ func agnivade(s, t string) float64 {
 func main() {
 	flag.Parse()
 
-	if *cpuprofile != "" {
-		f, err := os.Create(*cpuprofile)
-		if err != nil {
-			panic(err)
-		}
-		pprof.StartCPUProfile(f)
-		defer pprof.StopCPUProfile()
-	}
-
 	var edFunc func(s, t string) float64
 	switch *algo {
 	case "texttheater":
@@ -55,16 +46,28 @@ func main() {
 	counts := make(map[string]int)
 	r := bufio.NewReaderSize(os.Stdin, *bufsize)
 	peeked, _ := r.Peek(*bufsize)
-	offset := peeker.Calcoff(peeked, 64)
 	input := bufio.NewScanner(r)
 	arc, err := lru.New[string, interface{}](*lookback)
-	processed := 0
-	loops := 0
-	printed := 0
-
 	if err != nil {
 		panic(err)
 	}
+
+	processed := 0
+	loops := 0
+	printed := 0
+	similarityThreshold := (float64(*similarity) / 100.0)
+
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			panic(err)
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}
+
+	offset := peeker.Calcoff(peeked, 64)
+
 	for input.Scan() {
 		line := input.Text()
 		linekey := line
@@ -74,7 +77,7 @@ func main() {
 		found := false
 		for _, k := range arc.Keys() {
 			loops++
-			if edFunc(linekey, k) >= (float64(*similarity) / 100.0) {
+			if edFunc(linekey, k) >= similarityThreshold {
 				counts[k]++
 				found = true
 				break
