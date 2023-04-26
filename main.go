@@ -43,7 +43,6 @@ func main() {
 		edFunc = agnivade
 	}
 
-	counts := make(map[string]int)
 	r := bufio.NewReaderSize(os.Stdin, *bufsize)
 	peeked, _ := r.Peek(*bufsize)
 	input := bufio.NewScanner(r)
@@ -78,13 +77,11 @@ func main() {
 		for _, k := range arc.Keys() {
 			loops++
 			if edFunc(linekey, k) >= similarityThreshold {
-				counts[k]++
 				found = true
 				break
 			}
 		}
 		if !found {
-			counts[linekey] = 1
 			arc.Add(linekey, nil)
 			fmt.Printf("%s\n", line)
 			printed++
@@ -96,6 +93,8 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Offset: %d\n", offset)
 		fmt.Fprintf(os.Stderr, "Total lines: %d\n", processed)
 		fmt.Fprintf(os.Stderr, "Total loops: %d\n", loops)
+		fmt.Fprintf(os.Stderr, "loops/line: %.2f\n", float64(loops)/float64(processed))
+		fmt.Fprintf(os.Stderr, "average cache search: %.2f\n", (float64(loops)/float64(processed))/float64(*lookback))
 		fmt.Fprintf(os.Stderr, "Printed: %d %.2f%%\n", printed, 100.0*(float64(printed)/float64(processed)))
 	}
 }
