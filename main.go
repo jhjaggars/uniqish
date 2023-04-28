@@ -4,11 +4,9 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"math"
 	"os"
 	"runtime/pprof"
 
-	"github.com/hashicorp/golang-lru/v2"
 	"github.com/jhjaggars/uniqish/pkg/compare"
 	"github.com/jhjaggars/uniqish/pkg/peeker"
 )
@@ -23,15 +21,9 @@ var stats = flag.Bool("stats", false, "show stats after processing")
 func main() {
 	flag.Parse()
 
-	comparer := compare.New(*algo)
-
 	r := bufio.NewReaderSize(os.Stdin, *bufsize)
 	peeked, _ := r.Peek(*bufsize)
 	input := bufio.NewScanner(r)
-	arc, err := lru.New[string, interface{}](*lookback)
-	if err != nil {
-		panic(err)
-	}
 
 	var processed, loops, printed, compared int
 	similarityThreshold := (float64(*similarity) / 100.0)
@@ -47,30 +39,17 @@ func main() {
 
 	offset := peeker.Calcoff(peeked, 64)
 
+	comparer := compare.New(*algo, *lookback, similarityThreshold)
+
 	for input.Scan() {
 		line := input.Text()
 		linekey := line
 		if len(line) >= offset {
 			linekey = line[offset:]
 		}
-		found := false
-		for _, k := range arc.Keys() {
-			loops++
 
-			if math.Abs(float64(len(linekey)-len(k)))/float64(len(k)) >= similarityThreshold {
-				continue
-			}
-
-			compared++
-
-			if comparer.Compare(linekey, k) >= similarityThreshold {
-				found = true
-				break
-			}
-		}
-		if !found {
-			arc.Add(linekey, nil)
-			fmt.Printf("%s\n", line)
+		if !comparer.Compare(linekey) {
+			fmt.Println(line)
 			printed++
 		}
 		processed++
