@@ -24,6 +24,7 @@ func (e *editDistanceComparer) Compare(s string) bool {
 		}
 
 		if e.cmp(s, k) >= e.similarity {
+			e.cache.Get(k)
 			return true
 		}
 	}
@@ -72,12 +73,19 @@ func New(which string, lookback int, similarity float64) Comparer {
 		}
 		return &SetCompare{
 			cache:      cache,
-			simularity: float64(similarity),
+			similarity: float64(similarity),
 		}
 	}
 
 	if which == "texttheater" {
 		return NewEditDistanceCompare(tt_compare, lookback, similarity)
+	}
+
+	if which == "newword" {
+		return &NewWordCompare{
+			cache:      make(map[string]interface{}),
+			similarity: similarity,
+		}
 	}
 
 	return NewEditDistanceCompare(ag_compare, lookback, similarity)
@@ -86,8 +94,15 @@ func New(which string, lookback int, similarity float64) Comparer {
 type SetCompare struct {
 	// cache      []map[string]interface{}
 	cache      *lru.Cache[int, map[string]interface{}]
-	simularity float64
+	similarity float64
 	idx        int
+}
+
+func isAlpha(ch byte) bool {
+	if (ch >= 65 && ch <= 90) || (ch >= 97 && ch <= 122) {
+		return true
+	}
+	return false
 }
 
 func (s *SetCompare) Compare(in string) bool {
@@ -98,8 +113,7 @@ func (s *SetCompare) Compare(in string) bool {
 
 	for buf.Scan() {
 		word := buf.Text()
-		ch := word[0]
-		if (ch >= 65 && ch <= 90) || (ch >= 97 && ch <= 122) {
+		if isAlpha(word[0]) {
 			inMap[word] = nil
 		}
 	}
@@ -109,7 +123,7 @@ func (s *SetCompare) Compare(in string) bool {
 	}
 
 	for _, test := range s.cache.Keys() {
-		v, _ := s.cache.Get(test)
+		v, _ := s.cache.Peek(test)
 		intersection := make(map[string]interface{})
 		union := make(map[string]interface{})
 
@@ -125,7 +139,8 @@ func (s *SetCompare) Compare(in string) bool {
 			union[w] = nil
 		}
 
-		if float64(len(intersection))/float64(len(union)) >= s.simularity {
+		if float64(len(intersection))/float64(len(union)) >= s.similarity {
+			s.cache.Get(test)
 			return true
 		}
 	}
@@ -134,4 +149,28 @@ func (s *SetCompare) Compare(in string) bool {
 	s.idx = s.idx + 1
 
 	return false
+}
+
+type NewWordCompare struct {
+	cache      map[string]interface{}
+	similarity float64
+}
+
+func (n *NewWordCompare) Compare(in string) bool {
+	buf := bufio.NewScanner(strings.NewReader(in))
+	buf.Split(bufio.ScanWords)
+	var tried, found int
+
+	for buf.Scan() {
+		word := buf.Text()
+		if !isAlpha(word[0]) {
+			continue
+		}
+		if _, ok := n.cache[word]; ok {
+			found = found + 1
+		}
+		tried = tried + 1
+		n.cache[word] = nil
+	}
+	return float64(found)/float64(tried) >= n.similarity
 }
