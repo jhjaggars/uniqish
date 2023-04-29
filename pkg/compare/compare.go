@@ -10,19 +10,27 @@ import (
 	tt "github.com/texttheater/golang-levenshtein/levenshtein"
 )
 
+type Stats struct {
+	Loops    int
+	Compares int
+}
+
 type editDistanceComparer struct {
 	cache      *lru.Cache[string, interface{}]
 	similarity float64
 	cmp        ed
+	stats      *Stats
 }
 
 func (e *editDistanceComparer) Compare(s string) bool {
 
 	for _, k := range e.cache.Keys() {
+		e.stats.Loops++
 		if math.Abs(float64(len(s)-len(k)))/float64(len(k)) >= e.similarity {
 			continue
 		}
 
+		e.stats.Compares++
 		if e.cmp(s, k) >= e.similarity {
 			e.cache.Get(k)
 			return true
@@ -33,12 +41,17 @@ func (e *editDistanceComparer) Compare(s string) bool {
 	return false
 }
 
+func (e *editDistanceComparer) GetStats() *Stats {
+	return e.stats
+}
+
 var _ Comparer = &editDistanceComparer{}
 
 type ed func(s, t string) float64
 
 type Comparer interface {
 	Compare(s string) bool
+	GetStats() *Stats
 }
 
 func tt_compare(s, t string) float64 {
@@ -62,6 +75,7 @@ func NewEditDistanceCompare(cmp ed, lookback int, similarity float64) *editDista
 		similarity: float64(similarity),
 		cache:      cache,
 		cmp:        cmp,
+		stats:      &Stats{},
 	}
 }
 
@@ -74,6 +88,7 @@ func New(which string, lookback int, similarity float64) Comparer {
 		return &SetCompare{
 			cache:      cache,
 			similarity: float64(similarity),
+			stats:      &Stats{},
 		}
 	}
 
@@ -85,6 +100,7 @@ func New(which string, lookback int, similarity float64) Comparer {
 		return &NewWordCompare{
 			cache:      make(map[string]interface{}),
 			similarity: similarity,
+			stats:      &Stats{},
 		}
 	}
 
@@ -96,6 +112,7 @@ type SetCompare struct {
 	cache      *lru.Cache[int, map[string]interface{}]
 	similarity float64
 	idx        int
+	stats      *Stats
 }
 
 func isAlpha(ch byte) bool {
@@ -123,6 +140,7 @@ func (s *SetCompare) Compare(in string) bool {
 	}
 
 	for _, test := range s.cache.Keys() {
+		s.stats.Loops++
 		v, _ := s.cache.Peek(test)
 		intersection := make(map[string]interface{})
 		union := make(map[string]interface{})
@@ -139,6 +157,7 @@ func (s *SetCompare) Compare(in string) bool {
 			union[w] = nil
 		}
 
+		s.stats.Compares++
 		if float64(len(intersection))/float64(len(union)) >= s.similarity {
 			s.cache.Get(test)
 			return true
@@ -151,9 +170,14 @@ func (s *SetCompare) Compare(in string) bool {
 	return false
 }
 
+func (s *SetCompare) GetStats() *Stats {
+	return s.stats
+}
+
 type NewWordCompare struct {
 	cache      map[string]interface{}
 	similarity float64
+	stats      *Stats
 }
 
 func (n *NewWordCompare) Compare(in string) bool {
@@ -161,6 +185,8 @@ func (n *NewWordCompare) Compare(in string) bool {
 	buf.Split(bufio.ScanWords)
 	var tried, found int
 
+	n.stats.Loops++
+	n.stats.Compares++
 	for buf.Scan() {
 		word := buf.Text()
 		if !isAlpha(word[0]) {
@@ -173,4 +199,8 @@ func (n *NewWordCompare) Compare(in string) bool {
 		n.cache[word] = nil
 	}
 	return float64(found)/float64(tried) >= n.similarity
+}
+
+func (n *NewWordCompare) GetStats() *Stats {
+	return n.stats
 }

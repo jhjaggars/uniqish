@@ -25,7 +25,7 @@ func main() {
 	peeked, _ := r.Peek(*bufsize)
 	input := bufio.NewScanner(r)
 
-	var processed, loops, printed, compared int
+	var processed, printed int
 	similarityThreshold := (float64(*similarity) / 100.0)
 
 	if *cpuprofile != "" {
@@ -44,6 +44,7 @@ func main() {
 	for input.Scan() {
 		line := input.Text()
 		linekey := line
+
 		if len(line) >= offset {
 			linekey = line[offset:]
 		}
@@ -58,10 +59,10 @@ func main() {
 	if *stats {
 		fmt.Fprintf(os.Stderr, "Offset: %d\n", offset)
 		fmt.Fprintf(os.Stderr, "Total lines: %d\n", processed)
-		fmt.Fprintf(os.Stderr, "Total loops: %d\n", loops)
-		fmt.Fprintf(os.Stderr, "Total compares: %d\n", compared)
-		fmt.Fprintf(os.Stderr, "loops/line: %.2f\n", float64(loops)/float64(processed))
-		fmt.Fprintf(os.Stderr, "average cache search: %.2f\n", (float64(loops)/float64(processed))/float64(*lookback))
+		fmt.Fprintf(os.Stderr, "Total loops: %d\n", comparer.GetStats().Loops)
+		fmt.Fprintf(os.Stderr, "Total compares: %d\n", comparer.GetStats().Compares)
+		fmt.Fprintf(os.Stderr, "loops/line: %.2f\n", float64(comparer.GetStats().Loops)/float64(processed))
+		fmt.Fprintf(os.Stderr, "average cache search: %.2f\n", (float64(comparer.GetStats().Loops)/float64(processed))/float64(*lookback))
 		fmt.Fprintf(os.Stderr, "Printed: %d %.2f%%\n", printed, 100.0*(float64(printed)/float64(processed)))
 	}
 }
