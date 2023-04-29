@@ -39,7 +39,9 @@ func main() {
 
 	offset := peeker.Calcoff(peeked, 64)
 
-	comparer := compare.New(*algo, *lookback, similarityThreshold)
+	compareStats := &compare.Stats{}
+
+	comparer := compare.New(*algo, *lookback, similarityThreshold, compareStats)
 
 	for input.Scan() {
 		line := input.Text()
@@ -59,10 +61,10 @@ func main() {
 	if *stats {
 		fmt.Fprintf(os.Stderr, "Offset: %d\n", offset)
 		fmt.Fprintf(os.Stderr, "Total lines: %d\n", processed)
-		fmt.Fprintf(os.Stderr, "Total loops: %d\n", comparer.GetStats().Loops)
-		fmt.Fprintf(os.Stderr, "Total compares: %d\n", comparer.GetStats().Compares)
-		fmt.Fprintf(os.Stderr, "loops/line: %.2f\n", float64(comparer.GetStats().Loops)/float64(processed))
-		fmt.Fprintf(os.Stderr, "average cache search: %.2f\n", (float64(comparer.GetStats().Loops)/float64(processed))/float64(*lookback))
+		fmt.Fprintf(os.Stderr, "Total loops: %d\n", compareStats.Loops)
+		fmt.Fprintf(os.Stderr, "Total compares: %d\n", compareStats.Compares)
+		fmt.Fprintf(os.Stderr, "loops/line: %.2f\n", float64(compareStats.Loops)/float64(processed))
+		fmt.Fprintf(os.Stderr, "average cache search: %.2f\n", (float64(compareStats.Loops)/float64(processed))/float64(*lookback))
 		fmt.Fprintf(os.Stderr, "Printed: %d %.2f%%\n", printed, 100.0*(float64(printed)/float64(processed)))
 	}
 }

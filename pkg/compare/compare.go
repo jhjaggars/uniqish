@@ -3,6 +3,7 @@ package compare
 import (
 	"bufio"
 	"math"
+	"regexp"
 	"strings"
 
 	ag "github.com/agnivade/levenshtein"
@@ -41,17 +42,12 @@ func (e *editDistanceComparer) Compare(s string) bool {
 	return false
 }
 
-func (e *editDistanceComparer) GetStats() *Stats {
-	return e.stats
-}
-
 var _ Comparer = &editDistanceComparer{}
 
 type ed func(s, t string) float64
 
 type Comparer interface {
 	Compare(s string) bool
-	GetStats() *Stats
 }
 
 func tt_compare(s, t string) float64 {
@@ -66,7 +62,7 @@ func ag_compare(s, t string) float64 {
 
 var DefaultName string = "agnivade"
 
-func NewEditDistanceCompare(cmp ed, lookback int, similarity float64) *editDistanceComparer {
+func NewEditDistanceCompare(cmp ed, lookback int, similarity float64, stats *Stats) *editDistanceComparer {
 	cache, err := lru.New[string, interface{}](lookback)
 	if err != nil {
 		panic(err)
@@ -75,11 +71,11 @@ func NewEditDistanceCompare(cmp ed, lookback int, similarity float64) *editDista
 		similarity: float64(similarity),
 		cache:      cache,
 		cmp:        cmp,
-		stats:      &Stats{},
+		stats:      stats,
 	}
 }
 
-func New(which string, lookback int, similarity float64) Comparer {
+func New(which string, lookback int, similarity float64, stats *Stats) Comparer {
 	if which == "set" {
 		cache, err := lru.New[int, map[string]interface{}](lookback)
 		if err != nil {
@@ -88,23 +84,31 @@ func New(which string, lookback int, similarity float64) Comparer {
 		return &SetCompare{
 			cache:      cache,
 			similarity: float64(similarity),
-			stats:      &Stats{},
+			stats:      stats,
 		}
 	}
 
 	if which == "texttheater" {
-		return NewEditDistanceCompare(tt_compare, lookback, similarity)
+		return NewEditDistanceCompare(tt_compare, lookback, similarity, stats)
 	}
 
 	if which == "newword" {
 		return &NewWordCompare{
 			cache:      make(map[string]interface{}),
 			similarity: similarity,
-			stats:      &Stats{},
+			stats:      stats,
 		}
 	}
 
-	return NewEditDistanceCompare(ag_compare, lookback, similarity)
+	if which == "newwordtwo" {
+		return &NewWordCompareTwo{
+			cache:      make(map[string]interface{}),
+			similarity: similarity,
+			stats:      stats,
+		}
+	}
+
+	return NewEditDistanceCompare(ag_compare, lookback, similarity, stats)
 }
 
 type SetCompare struct {
@@ -170,10 +174,6 @@ func (s *SetCompare) Compare(in string) bool {
 	return false
 }
 
-func (s *SetCompare) GetStats() *Stats {
-	return s.stats
-}
-
 type NewWordCompare struct {
 	cache      map[string]interface{}
 	similarity float64
@@ -201,6 +201,28 @@ func (n *NewWordCompare) Compare(in string) bool {
 	return float64(found)/float64(tried) >= n.similarity
 }
 
-func (n *NewWordCompare) GetStats() *Stats {
-	return n.stats
+var pat = regexp.MustCompile(`\W`)
+
+type NewWordCompareTwo struct {
+	cache      map[string]interface{}
+	similarity float64
+	stats      *Stats
+}
+
+func (n *NewWordCompareTwo) Compare(in string) bool {
+	var tried, found int
+
+	n.stats.Loops++
+	n.stats.Compares++
+	for _, word := range pat.Split(in, -1) {
+		if len(word) == 0 || !isAlpha(word[0]) {
+			continue
+		}
+		if _, ok := n.cache[word]; ok {
+			found = found + 1
+		}
+		tried = tried + 1
+		n.cache[word] = nil
+	}
+	return float64(found)/float64(tried) >= n.similarity
 }
