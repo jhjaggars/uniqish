@@ -23,5 +23,5 @@ func (o *AlgorithmOptions) AddFlags(fs *flag.FlagSet, prefix string) {
 		prefix = prefix + "."
 	}
 
-	o.Algorithm = fs.String(prefix+"algorithm", DefaultName, "the name of the algorithm to use")
+	o.Algorithm = fs.String(prefix+"algorithm", "agnivade", "the name of the algorithm to use")
 }

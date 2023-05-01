@@ -4,15 +4,9 @@ import (
 	"bufio"
 	"regexp"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 )
-
-func isAlpha(ch rune) bool {
-	if (ch >= 65 && ch <= 90) || (ch >= 97 && ch <= 122) {
-		return true
-	}
-	return false
-}
 
 var AllTokenizers = map[string]Tokenizer{
 	"words":         &Words{},
@@ -32,7 +26,7 @@ func (w *Words) Tokenize(in string) []string {
 	buf.Split(bufio.ScanWords)
 	for buf.Scan() {
 		word := buf.Text()
-		if !isAlpha(rune(word[0])) {
+		if !unicode.IsLetter(rune(word[0])) {
 			continue
 		}
 		tokens = append(tokens, word)
@@ -49,7 +43,7 @@ var pat = regexp.MustCompile(`\W`)
 func (r *RegexpNonWords) Tokenize(in string) []string {
 	var tokens []string
 	for _, word := range pat.Split(in, -1) {
-		if len(word) == 0 || !isAlpha(rune(word[0])) {
+		if len(word) == 0 || !unicode.IsLetter(rune(word[0])) {
 			continue
 		}
 		tokens = append(tokens, word)
@@ -102,7 +96,7 @@ func (a *AlphaBoundary) scanAlphaChunks(data []byte, atEOF bool) (advance int, t
 	for width, i := 0, start; i < len(data); i += width {
 		var r rune
 		r, width = utf8.DecodeRune(data[i:])
-		if (a.inAlpha && !isAlpha(r)) || (!a.inAlpha && isAlpha(r)) {
+		if (a.inAlpha && !unicode.IsLetter(r)) || (!a.inAlpha && unicode.IsLetter(r)) {
 			a.inAlpha = !a.inAlpha
 			return i, data[start:i], nil
 		}
