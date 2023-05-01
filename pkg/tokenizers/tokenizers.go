@@ -111,6 +111,7 @@ func (a *AlphaBoundary) scanAlphaChunks(data []byte, atEOF bool) (advance int, t
 
 func (a *AlphaBoundary) Tokenize(in string) []string {
 	var tokens []string
+	a.inAlpha = false
 	buf := bufio.NewScanner(strings.NewReader(in))
 	buf.Split(a.scanAlphaChunks)
 	for buf.Scan() {

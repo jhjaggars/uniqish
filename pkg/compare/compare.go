@@ -1,9 +1,7 @@
 package compare
 
 import (
-	"bufio"
 	"math"
-	"strings"
 
 	ag "github.com/agnivade/levenshtein"
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -124,31 +122,18 @@ func New(which string, lookback int, similarity float64, stats *Stats) Comparer 
 }
 
 type SetCompare struct {
-	// cache      []map[string]interface{}
 	cache      *lru.Cache[int, map[string]interface{}]
 	similarity float64
 	idx        int
 	stats      *Stats
 }
 
-func isAlpha(ch rune) bool {
-	if (ch >= 65 && ch <= 90) || (ch >= 97 && ch <= 122) {
-		return true
-	}
-	return false
-}
-
 func (s *SetCompare) Compare(in string) bool {
 	inMap := make(map[string]interface{}, 0)
 
-	buf := bufio.NewScanner(strings.NewReader(in))
-	buf.Split(bufio.ScanWords)
-
-	for buf.Scan() {
-		word := buf.Text()
-		if isAlpha(rune(word[0])) {
-			inMap[word] = nil
-		}
+	tokenizer := tokenizers.Words{}
+	for _, word := range tokenizer.Tokenize(in) {
+		inMap[word] = nil
 	}
 
 	if len(inMap) == 0 {
