@@ -1,13 +1,33 @@
 package compare
 
 import (
+	"container/list"
 	"math"
 
 	ag "github.com/agnivade/levenshtein"
-	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/jhjaggars/uniqish/pkg/tokenizers"
 	tt "github.com/texttheater/golang-levenshtein/levenshtein"
 )
+
+type ListWindow struct {
+	max    int
+	window list.List
+}
+
+func (w *ListWindow) Add(item interface{}) {
+	if w.window.Len() == w.max {
+		w.window.Remove(w.window.Back())
+	}
+	w.window.PushFront(item)
+}
+
+func (w *ListWindow) Promote(e *list.Element) {
+	w.window.MoveToFront(e)
+}
+
+func (w *ListWindow) Front() *list.Element {
+	return w.window.Front()
+}
 
 type Stats struct {
 	Loops    int
@@ -15,7 +35,7 @@ type Stats struct {
 }
 
 type editDistanceComparer struct {
-	cache      *lru.Cache[string, interface{}]
+	cache      *ListWindow
 	similarity float64
 	cmp        ed
 	stats      *Stats
@@ -23,7 +43,8 @@ type editDistanceComparer struct {
 
 func (e *editDistanceComparer) Compare(s string) bool {
 
-	for _, k := range e.cache.Keys() {
+	for elem := e.cache.Front(); elem != nil; elem = elem.Next() {
+		k := elem.Value.(string)
 		e.stats.Loops++
 		if math.Abs(float64(len(s)-len(k)))/float64(len(k)) >= e.similarity {
 			continue
@@ -31,12 +52,12 @@ func (e *editDistanceComparer) Compare(s string) bool {
 
 		e.stats.Compares++
 		if e.cmp(s, k) >= e.similarity {
-			e.cache.Get(k)
+			e.cache.Promote(elem)
 			return true
 		}
 	}
 
-	e.cache.Add(s, nil)
+	e.cache.Add(s)
 	return false
 }
 
@@ -61,26 +82,22 @@ func ag_compare(s, t string) float64 {
 var DefaultName string = "agnivade"
 
 func NewEditDistanceCompare(cmp ed, lookback int, similarity float64, stats *Stats) *editDistanceComparer {
-	cache, err := lru.New[string, interface{}](lookback)
-	if err != nil {
-		panic(err)
-	}
 	return &editDistanceComparer{
 		similarity: float64(similarity),
-		cache:      cache,
-		cmp:        cmp,
-		stats:      stats,
+		cache: &ListWindow{
+			max: lookback,
+		},
+		cmp:   cmp,
+		stats: stats,
 	}
 }
 
 func New(which string, lookback int, similarity float64, stats *Stats) Comparer {
 	if which == "set" {
-		cache, err := lru.New[int, map[string]interface{}](lookback)
-		if err != nil {
-			panic(err)
-		}
 		return &SetCompare{
-			cache:      cache,
+			cache: &ListWindow{
+				max: lookback,
+			},
 			similarity: float64(similarity),
 			stats:      stats,
 		}
@@ -122,9 +139,8 @@ func New(which string, lookback int, similarity float64, stats *Stats) Comparer 
 }
 
 type SetCompare struct {
-	cache      *lru.Cache[int, map[string]interface{}]
+	cache      *ListWindow
 	similarity float64
-	idx        int
 	stats      *Stats
 }
 
@@ -140,9 +156,9 @@ func (s *SetCompare) Compare(in string) bool {
 		return true
 	}
 
-	for _, test := range s.cache.Keys() {
+	for elem := s.cache.Front(); elem != nil; elem = elem.Next() {
 		s.stats.Loops++
-		v, _ := s.cache.Peek(test)
+		v := elem.Value.(map[string]interface{})
 		intersection := make(map[string]interface{})
 		union := make(map[string]interface{})
 
@@ -160,14 +176,12 @@ func (s *SetCompare) Compare(in string) bool {
 
 		s.stats.Compares++
 		if float64(len(intersection))/float64(len(union)) >= s.similarity {
-			s.cache.Get(test)
+			s.cache.Promote(elem)
 			return true
 		}
 	}
 
-	s.cache.Add(s.idx, inMap)
-	s.idx = s.idx + 1
-
+	s.cache.Add(inMap)
 	return false
 }
 
