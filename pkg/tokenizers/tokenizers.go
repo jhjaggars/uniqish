@@ -14,6 +14,12 @@ func isAlpha(ch rune) bool {
 	return false
 }
 
+var AllTokenizers = map[string]Tokenizer{
+	"words":         &Words{},
+	"nonwords":      &RegexpNonWords{},
+	"alphaboundary": &AlphaBoundary{},
+}
+
 type Tokenizer interface {
 	Tokenize(string) []string
 }

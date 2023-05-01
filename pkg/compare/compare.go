@@ -92,47 +92,32 @@ func NewEditDistanceCompare(cmp ed, lookback int, similarity float64, stats *Sta
 	}
 }
 
-func New(which string, lookback int, similarity float64, stats *Stats) Comparer {
+func New(algoOpts *AlgorithmOptions, lookbackOpts *LookBackOptions, tokenizerOpts *tokenizers.TokenizerOptions, similarity float64, stats *Stats) Comparer {
+	which := *algoOpts.Algorithm
+	lookback := *lookbackOpts.Lookback
+
 	if which == "set" {
 		return &SetCompare{
 			cache: &ListWindow{
 				max: lookback,
 			},
-			similarity: float64(similarity),
+			similarity: similarity,
 			stats:      stats,
+			tokenizer:  tokenizers.AllTokenizers[*tokenizerOpts.Name],
+		}
+	}
+
+	if which == "newword" {
+		return &NewWordCompare{
+			cache:      make(map[string]interface{}),
+			similarity: similarity,
+			stats:      stats,
+			tokenizer:  tokenizers.AllTokenizers[*tokenizerOpts.Name],
 		}
 	}
 
 	if which == "texttheater" {
 		return NewEditDistanceCompare(tt_compare, lookback, similarity, stats)
-	}
-
-	if which == "newword" {
-
-		return &NewWordCompare{
-			cache:      make(map[string]interface{}),
-			similarity: similarity,
-			stats:      stats,
-			tokenizer:  &tokenizers.Words{},
-		}
-	}
-
-	if which == "newwordtwo" {
-		return &NewWordCompare{
-			cache:      make(map[string]interface{}),
-			similarity: similarity,
-			stats:      stats,
-			tokenizer:  &tokenizers.RegexpNonWords{},
-		}
-	}
-
-	if which == "newwordthree" {
-		return &NewWordCompare{
-			cache:      make(map[string]interface{}),
-			similarity: similarity,
-			stats:      stats,
-			tokenizer:  &tokenizers.AlphaBoundary{},
-		}
 	}
 
 	return NewEditDistanceCompare(ag_compare, lookback, similarity, stats)
@@ -142,13 +127,13 @@ type SetCompare struct {
 	cache      *ListWindow
 	similarity float64
 	stats      *Stats
+	tokenizer  tokenizers.Tokenizer
 }
 
 func (s *SetCompare) Compare(in string) bool {
 	inMap := make(map[string]interface{}, 0)
 
-	tokenizer := tokenizers.Words{}
-	for _, word := range tokenizer.Tokenize(in) {
+	for _, word := range s.tokenizer.Tokenize(in) {
 		inMap[word] = nil
 	}
 

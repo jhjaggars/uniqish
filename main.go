@@ -9,27 +9,62 @@ import (
 
 	"github.com/jhjaggars/uniqish/pkg/compare"
 	"github.com/jhjaggars/uniqish/pkg/peeker"
+	"github.com/jhjaggars/uniqish/pkg/tokenizers"
 )
 
-var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
-var algo = flag.String("algorithm", compare.DefaultName, "which algorithim to use")
-var bufsize = flag.Int("bufsize", 1024*2, "how many bytes to read ahead to guess offset")
-var lookback = flag.Int("lookback", 16, "how many lines to keep in the lookback cache")
-var similarity = flag.Int("similarity", 80, "similarity percentage to consider a match")
-var stats = flag.Bool("stats", false, "show stats after processing")
+type GlobalOptions struct {
+	Cpuprofile *string
+	Bufsize    *int
+	Similarity *int
+	Stats      *bool
+}
+
+func (o *GlobalOptions) AddFlags(fs *flag.FlagSet, prefix string) {
+	if prefix != "" {
+		prefix = prefix + "."
+	}
+
+	o.Cpuprofile = fs.String(prefix+"cpuprofile", "", "write cpu profile to file")
+	o.Bufsize = fs.Int("bufsize", 1024*2, "how many bytes to read ahead to guess offset")
+	o.Similarity = fs.Int("similarity", 80, "similarity percentage to consider a match")
+	o.Stats = fs.Bool("stats", false, "show stats after processing")
+
+}
+
+var options = struct {
+	Global    *GlobalOptions
+	Lookback  *compare.LookBackOptions
+	Algorithm *compare.AlgorithmOptions
+	Tokenizer *tokenizers.TokenizerOptions
+}{
+	&GlobalOptions{},
+	&compare.LookBackOptions{},
+	&compare.AlgorithmOptions{},
+	&tokenizers.TokenizerOptions{},
+}
 
 func main() {
-	flag.Parse()
+	fs := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	options.Global.AddFlags(fs, "")
+	options.Algorithm.AddFlags(fs, "")
+	options.Lookback.AddFlags(fs, "")
+	options.Tokenizer.AddFlags(fs, "")
+	fs.Parse(os.Args[1:])
 
-	r := bufio.NewReaderSize(os.Stdin, *bufsize)
-	peeked, _ := r.Peek(*bufsize)
+	if err := options.Tokenizer.Validate(); err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(2)
+	}
+
+	r := bufio.NewReaderSize(os.Stdin, *options.Global.Bufsize)
+	peeked, _ := r.Peek(*options.Global.Bufsize)
 	input := bufio.NewScanner(r)
 
 	var processed, printed int
-	similarityThreshold := (float64(*similarity) / 100.0)
+	similarityThreshold := (float64(*options.Global.Similarity) / 100.0)
 
-	if *cpuprofile != "" {
-		f, err := os.Create(*cpuprofile)
+	if *options.Global.Cpuprofile != "" {
+		f, err := os.Create(*options.Global.Cpuprofile)
 		if err != nil {
 			panic(err)
 		}
@@ -41,7 +76,7 @@ func main() {
 
 	compareStats := &compare.Stats{}
 
-	comparer := compare.New(*algo, *lookback, similarityThreshold, compareStats)
+	comparer := compare.New(options.Algorithm, options.Lookback, options.Tokenizer, similarityThreshold, compareStats)
 
 	for input.Scan() {
 		line := input.Text()
@@ -58,13 +93,13 @@ func main() {
 		processed++
 	}
 
-	if *stats {
+	if *options.Global.Stats {
 		fmt.Fprintf(os.Stderr, "Offset: %d\n", offset)
 		fmt.Fprintf(os.Stderr, "Total lines: %d\n", processed)
 		fmt.Fprintf(os.Stderr, "Total loops: %d\n", compareStats.Loops)
 		fmt.Fprintf(os.Stderr, "Total compares: %d\n", compareStats.Compares)
 		fmt.Fprintf(os.Stderr, "loops/line: %.2f\n", float64(compareStats.Loops)/float64(processed))
-		fmt.Fprintf(os.Stderr, "average cache search: %.2f\n", (float64(compareStats.Loops)/float64(processed))/float64(*lookback))
+		fmt.Fprintf(os.Stderr, "average cache search: %.2f\n", (float64(compareStats.Loops)/float64(processed))/float64(*options.Lookback.Lookback))
 		fmt.Fprintf(os.Stderr, "Printed: %d %.2f%%\n", printed, 100.0*(float64(printed)/float64(processed)))
 	}
 }
