@@ -3,12 +3,11 @@ package compare
 import (
 	"bufio"
 	"math"
-	"regexp"
 	"strings"
-	"unicode/utf8"
 
 	ag "github.com/agnivade/levenshtein"
 	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/jhjaggars/uniqish/pkg/tokenizers"
 	tt "github.com/texttheater/golang-levenshtein/levenshtein"
 )
 
@@ -94,27 +93,30 @@ func New(which string, lookback int, similarity float64, stats *Stats) Comparer 
 	}
 
 	if which == "newword" {
+
 		return &NewWordCompare{
 			cache:      make(map[string]interface{}),
 			similarity: similarity,
 			stats:      stats,
+			tokenizer:  &tokenizers.Words{},
 		}
 	}
 
 	if which == "newwordtwo" {
-		return &NewWordCompareTwo{
+		return &NewWordCompare{
 			cache:      make(map[string]interface{}),
 			similarity: similarity,
 			stats:      stats,
+			tokenizer:  &tokenizers.RegexpNonWords{},
 		}
 	}
 
 	if which == "newwordthree" {
-		return &NewWordCompareThree{
+		return &NewWordCompare{
 			cache:      make(map[string]interface{}),
 			similarity: similarity,
 			stats:      stats,
-			inAlpha:    false,
+			tokenizer:  &tokenizers.AlphaBoundary{},
 		}
 	}
 
@@ -188,123 +190,15 @@ type NewWordCompare struct {
 	cache      map[string]interface{}
 	similarity float64
 	stats      *Stats
+	tokenizer  tokenizers.Tokenizer
 }
 
 func (n *NewWordCompare) Compare(in string) bool {
-	buf := bufio.NewScanner(strings.NewReader(in))
-	buf.Split(bufio.ScanWords)
 	var tried, found int
 
 	n.stats.Loops++
 	n.stats.Compares++
-	for buf.Scan() {
-		word := buf.Text()
-		if !isAlpha(rune(word[0])) {
-			continue
-		}
-		if _, ok := n.cache[word]; ok {
-			found = found + 1
-		}
-		tried = tried + 1
-		n.cache[word] = nil
-	}
-	return float64(found)/float64(tried) >= n.similarity
-}
-
-var pat = regexp.MustCompile(`\W`)
-
-type NewWordCompareTwo struct {
-	cache      map[string]interface{}
-	similarity float64
-	stats      *Stats
-}
-
-func (n *NewWordCompareTwo) Compare(in string) bool {
-	var tried, found int
-
-	n.stats.Loops++
-	n.stats.Compares++
-	for _, word := range pat.Split(in, -1) {
-		if len(word) == 0 || !isAlpha(rune(word[0])) {
-			continue
-		}
-		if _, ok := n.cache[word]; ok {
-			found = found + 1
-		}
-		tried = tried + 1
-		n.cache[word] = nil
-	}
-	return float64(found)/float64(tried) >= n.similarity
-}
-
-func isSpace(r rune) bool {
-	if r <= '\u00FF' {
-		// Obvious ASCII ones: \t through \r plus space. Plus two Latin-1 oddballs.
-		switch r {
-		case ' ', '\t', '\n', '\v', '\f', '\r':
-			return true
-		case '\u0085', '\u00A0':
-			return true
-		}
-		return false
-	}
-	// High-valued ones.
-	if '\u2000' <= r && r <= '\u200a' {
-		return true
-	}
-	switch r {
-	case '\u1680', '\u2028', '\u2029', '\u202f', '\u205f', '\u3000':
-		return true
-	}
-	return false
-}
-
-func (n *NewWordCompareThree) scanAlphaChunks(data []byte, atEOF bool) (advance int, token []byte, err error) {
-	// Skip leading spaces.
-	start := 0
-	for width := 0; start < len(data); start += width {
-		var r rune
-		r, width = utf8.DecodeRune(data[start:])
-		if !isSpace(r) {
-			break
-		}
-	}
-	// Scan until space, marking end of word.
-	for width, i := 0, start; i < len(data); i += width {
-		var r rune
-		r, width = utf8.DecodeRune(data[i:])
-		if (n.inAlpha && !isAlpha(r)) || (!n.inAlpha && isAlpha(r)) {
-			n.inAlpha = !n.inAlpha
-			return i, data[start:i], nil
-		}
-	}
-	// If we're at EOF, we have a final, non-empty, non-terminated word. Return it.
-	if atEOF && len(data) > start {
-		return len(data), data[start:], nil
-	}
-	// Request more data.
-	return start, nil, nil
-}
-
-type NewWordCompareThree struct {
-	cache      map[string]interface{}
-	similarity float64
-	stats      *Stats
-	inAlpha    bool
-}
-
-func (n *NewWordCompareThree) Compare(in string) bool {
-	buf := bufio.NewScanner(strings.NewReader(in))
-	buf.Split(n.scanAlphaChunks)
-	var tried, found int
-
-	n.stats.Loops++
-	n.stats.Compares++
-	for buf.Scan() {
-		word := buf.Text()
-		if len(word) == 0 {
-			continue
-		}
+	for _, word := range n.tokenizer.Tokenize(in) {
 		if _, ok := n.cache[word]; ok {
 			found = found + 1
 		}
