@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime"
 	"runtime/pprof"
 
 	"github.com/jhjaggars/uniqish/pkg/compare"
@@ -14,6 +15,7 @@ import (
 
 type GlobalOptions struct {
 	Cpuprofile *string
+	Memprofile *string
 	Bufsize    *int
 	Similarity *int
 	Stats      *bool
@@ -25,6 +27,7 @@ func (o *GlobalOptions) AddFlags(fs *flag.FlagSet, prefix string) {
 	}
 
 	o.Cpuprofile = fs.String(prefix+"cpuprofile", "", "write cpu profile to file")
+	o.Memprofile = fs.String(prefix+"memprofile", "", "write memory profile to file")
 	o.Bufsize = fs.Int("bufsize", 1024*2, "how many bytes to read ahead to guess offset")
 	o.Similarity = fs.Int("similarity", 80, "similarity percentage to consider a match")
 	o.Stats = fs.Bool("stats", false, "show stats after processing")
@@ -91,6 +94,20 @@ func main() {
 			printed++
 		}
 		processed++
+	}
+
+	if *options.Global.Memprofile != "" {
+		f, err := os.Create(*options.Global.Memprofile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "could not create memory profile: %s", err.Error())
+		}
+		runtime.GC()
+		if err := pprof.WriteHeapProfile(f); err != nil {
+			fmt.Fprintf(os.Stderr, "could not write memory profile: %s", err.Error())
+		}
+		if err = f.Close(); err != nil {
+			fmt.Fprintf(os.Stderr, "could not close memory profile file: %s", err.Error())
+		}
 	}
 
 	if *options.Global.Stats {

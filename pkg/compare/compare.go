@@ -39,6 +39,10 @@ func New(algoOpts *AlgorithmOptions, lookbackOpts *LookBackOptions, tokenizerOpt
 		edFunc = tt_compare
 	}
 
+	if which == "fastlev" {
+		edFunc = fast_lev
+	}
+
 	return &editDistanceComparer{
 		similarity: similarity,
 		cache:      cache,

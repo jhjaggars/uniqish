@@ -4,6 +4,7 @@ import (
 	"math"
 
 	ag "github.com/agnivade/levenshtein"
+	fast "github.com/ka-weihe/fast-levenshtein"
 	tt "github.com/texttheater/golang-levenshtein/levenshtein"
 )
 
@@ -26,6 +27,12 @@ func tt_compare(s, t string) float64 {
 
 func ag_compare(s, t string) float64 {
 	dist := float64(ag.ComputeDistance(s, t))
+	totalLen := float64(len(s) + len(t))
+	return (totalLen - dist) / totalLen
+}
+
+func fast_lev(s, t string) float64 {
+	dist := float64(fast.Distance(s, t))
 	totalLen := float64(len(s) + len(t))
 	return (totalLen - dist) / totalLen
 }
